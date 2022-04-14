@@ -1,4 +1,4 @@
-DOCKER_REPOSITORY hyoon/mlsdp
+DOCKER_REPOSITORY := hgyoon0928/mlsdp
 
 ABSOLUTE_PATH := $(shell pwd)
 

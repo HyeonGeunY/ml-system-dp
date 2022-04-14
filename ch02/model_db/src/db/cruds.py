@@ -49,6 +49,10 @@ def add_project(
         return data
 
 
+def select_model_all(db: Session) -> List[schemas.Model]:
+    return db.query(models.Model).all()
+
+
 def select_model_by_id(
     db: Session,
     model_id: str,
