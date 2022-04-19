@@ -28,5 +28,5 @@ def parse_pickle(rawdata, rootdir) -> List[List[str]]:
         with Image.fromarray(data) as img:
             image_path = f"{rootdir}/{label}/{filename}"
             img.save(image_path)
-        class_to_filename_list.append([label, filename])
+        class_to_filename_list.append([label, filename]) # 클래스별 파일 한장씩 담은 리스트의 리스트
     return class_to_filename_list

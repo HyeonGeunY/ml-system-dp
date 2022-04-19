@@ -74,14 +74,16 @@ def main():
         os.makedirs(test_output_destination, exist_ok=True)
         os.makedirs(cifar10_directory, exist_ok=True)
         
-        # train 데이터 다운
+        # root/cifar-10-batches-py 디렉토리에 cifar-10-python.tar.gz 데이터 다운로드 한 후
+        # data_batch_{num} 형태로 extract
         torchvision.datasets.CIFAR10(
             root=downstream_directory,
             train=True,
             download=True,
         )
         
-        # test 데이터 다운
+        # root/cifar-10-batches-py 디렉토리에 cifar-10-python.tar.gz 데이터 다운로드 한 후
+        # test_batch 형태로 extract
         torchvision.datasets.CIFAR10(
             root=downstream_directory,
             train=False,
@@ -102,7 +104,8 @@ def main():
             ) # rawdata의 파일을 train_output_destination / 클래스 레이블 / 디렉토리에 저장
             for cf in class_to_filename: # clas_to_filename: cf: ([label, filname]) 를 담은 리스트
                 meta_train[int(cf[0])].append(cf[1]) # cf: [label, filname]
-                
+        
+        # test_set
         for f in PreprocessConfigurations.test_files:
             rawdata = unpickle(file=os.path.join(cifar10_directory, f))
             class_to_filename = parse_pickle(
