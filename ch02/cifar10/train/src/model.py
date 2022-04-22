@@ -254,56 +254,6 @@ def evaluate(
     return accuracy, float(loss)
 
 
-def train(
-    model: nn.Module,
-    train_dataloader: DataLoader,
-    test_dataloader: DataLoader,
-    criterion,
-    optimizer,
-    writer: SummaryWriter,
-    epochs: int = 10,
-    checkpoints_directory: str = "/opt/cifar10/model/",
-    device: str = "cpu",
-):
-    logger.info("start training...")
-    for epoch in range(epochs):
-        running_loss = 0.0
-        logger.info(f"starting epoch: {epoch}")
-        epoch_start = time.time()
-        start = time.time()
-        for i, data in enumerate(train_dataloader, 0):
-            images, labels = data[0].to(device), data[1].to(device)
-
-            optimizer.zero_grad()
-
-            outputs = model(images)
-            loss = criterion(outputs, labels)
-            loss.backward()
-            optimizer.step()
-
-            running_loss += loss.item()
-            writer.add_scalar("data/total_loss", float(loss.item()), (epoch + 1) * i)
-            writer.add_scalar("Loss/train", float(running_loss / (i + 1)), (epoch + 1) * i)
-
-            if i % 200 == 199:
-                end = time.time()
-                logger.info(f"[{epoch}, {i}] loss: {running_loss / 200} duration: {end - start}")
-                running_loss = 0.0
-                start = time.time()
-        epoch_end = time.time()
-        logger.info(f"[{epoch}] duration in seconds: {epoch_end - epoch_start}")
-
-        _, loss = evaluate(
-            model=model,
-            test_dataloader=test_dataloader,
-            criterion=criterion,
-            writer=writer,
-            epoch=epoch,
-            device=device,
-        )
-        checkpoints = os.path.join(checkpoints_directory, f"epoch_{epoch}_loss_{loss}.pth")
-        logger.info(f"save checkpoints: {checkpoints}")
-        torch.save(model.state_dict(), checkpoints)
 
 
 def train(
@@ -348,7 +298,7 @@ def train(
         # epochs 당 시간 체크
         logger.info(f"[{epoch}] duration in seconds: {epoch_end - epoch_start}")
         
-         _, loss = evaluate(
+        _, loss = evaluate(
             model=model,
             test_dataloader=test_dataloader,
             criterion=criterion,

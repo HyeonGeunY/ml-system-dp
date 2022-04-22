@@ -34,3 +34,5 @@ def constant(f):
 
 class _Constants(object):
     pass
+
+CONSTANTS = _Constants()

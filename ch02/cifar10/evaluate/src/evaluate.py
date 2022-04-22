@@ -109,6 +109,140 @@ class Classifier(object):
         self.onnx_output_name: str = onnx_output_name
 
         
+    def predict(self, data: Image) -> List[float]:
+        preprocessed = self.preprocess_transformer.transform(data)
+
+        input_tensor = onnx_ml_pb2.TensorProto()
+        input_tensor.dims.extend(preprocessed.shape)
+        input_tensor.data_type = 1
+        input_tensor.raw_data = preprocessed.tobytes()
+
+        request_message = predict_pb2.PredictRequest()
+        request_message.inputs[self.onnx_input_name].data_type = input_tensor.data_type
+        request_message.inputs[self.onnx_input_name].dims.extend(preprocessed.shape)
+        request_message.inputs[self.onnx_input_name].raw_data = input_tensor.raw_data
+
+        response = self.stub.Predict(request_message)
+        output = np.frombuffer(response.outputs[self.onnx_output_name].raw_data, dtype=np.float32)
+
+        softmax = self.softmax_transformer.transform(output).tolist()
+
+        logger.info(f"predict proba {softmax}")
+        return softmax
+    
+    def predict_label(self, data: Image) -> int:
+        softmax = self.predict(data=data)
+        argmax = int(np.argmax(np.array(softmax)[0]))
+        logger.info(f"predict label {argmax}")
+        return argmax
+
+def evaluate(
+    test_data_directory: str,
+    preprocess_transformer: BaseEstimator = PytorchImagePreprocessTransformer,
+    softmax_transformer: BaseEstimator = SoftmaxTransformer,
+) -> Dict:
+    classifier = Classifier(
+        preprocess_transformer=preprocess_transformer,
+        softmax_transformer=softmax_transformer,
+        serving_address="localhost:50051",
+        onnx_input_name="input",
+        onnx_output_name="output",
+    )
+    
+    directory_list = os.listdir(test_data_directory)
+    predictions = {}
+    predicted = []
+    labels = []
+    durations = []
+    for c in directory_list:
+        c_path = os.path.join(test_data_directory, c)
+        c_list = os.listdir(c_path)
+
+        for f in c_list:
+            image_path = os.path.join(c_path, f)
+            image = Image.open(image_path)
+            start = time.time()
+            x = classifier.predict_label(image)
+            end = time.time()
+            duration = end - start
+            predicted.append(x)
+            labels.append(int(c))
+            durations.append(duration)
+            predictions[image_path] = {"label": c, "prediction": x}
+            logger.info(f"{image_path} label: {c} predicted: {x} duration: {duration} seconds")
+            
+    total_time = sum(durations)
+    total_tested = len(predicted)
+    average_duration_second = total_time / total_tested
+    accuracy = accuracy_score(labels, predicted)
+    
+    evaluation = {
+        "total_tested": total_tested,
+        "accuracy": accuracy,
+        "total_time": total_time,
+        "average_duration_second": average_duration_second,
+    }
+
+    return {"evaluation": evaluation, "predictions": predictions}
 
 
-m, 
+def main():
+    parser = argparse.ArgumentParser(
+        description="Evaluate Cifar10 model",
+        formatter_class=argparse.RawTextHelpFormatter,
+    )
+    parser.add_argument(
+        "--upstream",
+        type=str,
+        default="/opt/data/train",
+        help="upstream directory",
+    )
+    parser.add_argument(
+        "--downstream",
+        type=str,
+        default="/opt/data/evaluate/",
+        help="downstream directory", 
+    )
+    parser.add_argument(
+        "--test_data_directory",
+        type=str,
+        default="/opt/data/preprocess/test",
+        help="test data directory",
+    )
+    args = parser.parse_args()
+    mlflow_experiment_id = int(os.getenv("MLFLOW_EXPERIMENT_ID", 0))
+    
+    upstream_directory = args.upstream
+    downstream_directory = args.downstream
+    os.makedirs(upstream_directory, exist_ok=True)
+    os.makedirs(downstream_directory, exist_ok=True)
+    
+    result = evaluate(
+        test_data_directory=args.test_data_directory,
+    )
+    
+    log_file = os.path.join(downstream_directory, f"{mlflow_experiment_id}.json")
+    with open(log_file, "w") as f:
+        json.dump(log_file, f)
+    ## ?? 로그 파일?
+    
+    mlflow.log_metric(
+        "total_tested",
+        result["evaluation"]["total_tested"],
+    )
+    mlflow.log_metric(
+        "total_time",
+        result["evaluation"]["total_time"],
+    )
+    mlflow.log_metric(
+        "accuracy",
+        result["evaluation"]["accuracy"],
+    )
+    mlflow.log_metric(
+        "average_duration_second",
+        result["evaluation"]["average_duration_second"],
+    )
+    mlflow.log_artifact(log_file)
+
+if __name__ == "__main__":
+    main()

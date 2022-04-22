@@ -114,6 +114,7 @@ def start_run(
         epoch=epochs + 1,
         device=device,
     )
+    logger.info(f"Latest performance: Accuracy: {accuracy}, Loss: {loss}")
     
     writer.close()
     
